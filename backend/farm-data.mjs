@@ -1,0 +1,113 @@
+export const initialFarmState = {
+  farm: {
+    name: 'Demo Farm Tunisia',
+    region: 'Tunisia Agriculture Pilot',
+    lastUpdated: '2 minutes ago',
+  },
+  fields: [
+    {
+      id: 'field-a',
+      name: 'Field A',
+      crop: 'Olives',
+      region: 'Sfax',
+      areaHa: 2.5,
+      targetMoisture: 32,
+      minPressure: 1.8,
+      sensor: {
+        soilMoisture: 22,
+        rainProbability: 20,
+        rainForecast: 0,
+        heatwave: 'High',
+        et: 7.2,
+        pressure: 2.4,
+        flow: 180,
+      },
+      recommendation: {
+        priority: 'High',
+        action: 'Irrigate Tomorrow',
+        time: 'Tomorrow 06:00',
+        waterMm: 20,
+        liters: 500000,
+        reason:
+          'Low soil moisture, high heatwave risk, elevated evapotranspiration, and low rain probability.',
+        status: 'scheduled',
+      },
+      execution: {
+        status: 'ready',
+        currentLiters: 0,
+        duration: null,
+        notes: 'Ready for automatic valve execution',
+      },
+    },
+    {
+      id: 'field-b',
+      name: 'Field B',
+      crop: 'Tomatoes',
+      region: 'Sidi Bouzid',
+      areaHa: 1.2,
+      targetMoisture: 30,
+      minPressure: 1.7,
+      sensor: {
+        soilMoisture: 34,
+        rainProbability: 70,
+        rainForecast: 9,
+        heatwave: 'Low',
+        et: 4.1,
+        pressure: 2.1,
+        flow: 120,
+      },
+      recommendation: {
+        priority: 'Low',
+        action: 'Skip Irrigation',
+        time: null,
+        waterMm: 0,
+        liters: 0,
+        reason: 'High rain probability with 9 mm forecast rainfall expected.',
+        status: 'skipped',
+      },
+      execution: {
+        status: 'skipped',
+        currentLiters: 0,
+        duration: null,
+        notes: 'Rain expected (9 mm forecast)',
+      },
+    },
+    {
+      id: 'field-c',
+      name: 'Field C',
+      crop: 'Citrus',
+      region: 'Nabeul',
+      areaHa: 1.8,
+      targetMoisture: 35,
+      minPressure: 1.8,
+      sensor: {
+        soilMoisture: 25,
+        rainProbability: 35,
+        rainForecast: 1,
+        heatwave: 'Medium',
+        et: 5.6,
+        pressure: 1.3,
+        flow: 150,
+      },
+      recommendation: {
+        priority: 'Medium',
+        action: 'Execution Blocked',
+        time: null,
+        waterMm: 21,
+        liters: 378000,
+        reason: 'Pressure is below the minimum safe threshold for irrigation.',
+        status: 'blocked',
+      },
+      execution: {
+        status: 'blocked',
+        currentLiters: 0,
+        duration: null,
+        notes: 'Low pressure: 1.3 bar below safe 1.8 bar threshold',
+      },
+    },
+  ],
+};
+
+export function cloneFarmState() {
+  return structuredClone(initialFarmState);
+}

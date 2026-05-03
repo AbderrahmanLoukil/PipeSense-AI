@@ -1,222 +1,258 @@
-import { ArrowRight, RotateCcw, CloudRain, Radio, Cpu, Gauge } from 'lucide-react';
+import { ArrowRight, CloudRain, Cpu, Gauge, Radio, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
+import type { ComponentType } from 'react';
+import type { FarmField, FieldDiagnosticResult, SensorAdjustment, SimulationScenario } from '../types';
 
-export function ClimateAndSensors() {
-  const [sensorData, setSensorData] = useState({
-    fieldA: {
-      soilMoisture: 22,
-      rainProbability: 20,
-      rainForecast: 0,
-      heatwave: 'High',
-      et: 7.2,
-      pressure: 2.4,
-      flow: 180,
-    },
-    fieldB: {
-      soilMoisture: 34,
-      rainProbability: 70,
-      rainForecast: 9,
-      heatwave: 'Low',
-      et: 4.1,
-      pressure: 2.1,
-      flow: 120,
-    },
-    fieldC: {
-      soilMoisture: 25,
-      rainProbability: 35,
-      rainForecast: 1,
-      heatwave: 'Medium',
-      et: 5.6,
-      pressure: 1.3,
-      flow: 150,
-    },
-  });
+interface ClimateAndSensorsProps {
+  fields: FarmField[];
+  onSimulate: (scenario: SimulationScenario) => void;
+  onAdjustSensor: (fieldId: string, adjustment: SensorAdjustment) => void;
+  onRecalculate: () => void;
+  onRunDiagnostic: (fieldId: string) => Promise<FieldDiagnosticResult | null>;
+}
 
-  const simulateHeatwave = () => {
-    setSensorData(prev => ({
-      fieldA: { ...prev.fieldA, heatwave: 'High', et: 9.5, soilMoisture: 18 },
-      fieldB: { ...prev.fieldB, heatwave: 'High', et: 7.8, soilMoisture: 28 },
-      fieldC: { ...prev.fieldC, heatwave: 'High', et: 8.2, soilMoisture: 20 },
-    }));
-  };
+export function ClimateAndSensors({
+  fields,
+  onSimulate,
+  onAdjustSensor,
+  onRecalculate,
+  onRunDiagnostic,
+}: ClimateAndSensorsProps) {
+  const [diagnosticMessage, setDiagnosticMessage] = useState<string | null>(null);
+  const [diagnosticFieldId, setDiagnosticFieldId] = useState<string | null>(null);
 
-  const simulateRain = () => {
-    setSensorData(prev => ({
-      fieldA: { ...prev.fieldA, rainProbability: 85, rainForecast: 12, soilMoisture: 28 },
-      fieldB: { ...prev.fieldB, rainProbability: 90, rainForecast: 15, soilMoisture: 38 },
-      fieldC: { ...prev.fieldC, rainProbability: 80, rainForecast: 10, soilMoisture: 32 },
-    }));
-  };
-
-  const simulateLowPressure = () => {
-    setSensorData(prev => ({
-      fieldA: { ...prev.fieldA, pressure: 1.5 },
-      fieldB: { ...prev.fieldB, pressure: 1.4 },
-      fieldC: { ...prev.fieldC, pressure: 1.1 },
-    }));
-  };
-
-  const resetData = () => {
-    setSensorData({
-      fieldA: {
-        soilMoisture: 22,
-        rainProbability: 20,
-        rainForecast: 0,
-        heatwave: 'High',
-        et: 7.2,
-        pressure: 2.4,
-        flow: 180,
-      },
-      fieldB: {
-        soilMoisture: 34,
-        rainProbability: 70,
-        rainForecast: 9,
-        heatwave: 'Low',
-        et: 4.1,
-        pressure: 2.1,
-        flow: 120,
-      },
-      fieldC: {
-        soilMoisture: 25,
-        rainProbability: 35,
-        rainForecast: 1,
-        heatwave: 'Medium',
-        et: 5.6,
-        pressure: 1.3,
-        flow: 150,
-      },
-    });
-  };
   return (
-    <div className="p-8">
-      <div className="mb-10">
-        <h1 className="text-4xl text-gray-900 mb-3 tracking-tight">Climate & Sensors</h1>
-        <p className="text-lg text-gray-600">Real-time environmental data and IoT sensor network</p>
+    <div className="p-5 md:p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl text-slate-950 mb-2 tracking-tight md:text-4xl">Climate & Sensors</h1>
+        <p className="text-base text-slate-600 md:text-lg">Real-time environmental data and IoT sensor network</p>
       </div>
 
-      {/* Flow Diagram */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-10 mb-10 shadow-2xl border border-slate-700">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex-1 flex flex-col items-center text-center">
-            <div className="w-36 h-36 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-3 shadow-2xl">
-              <CloudRain className="w-16 h-16 text-white" strokeWidth={1.5} />
-            </div>
-            <div className="w-36 text-sm text-white font-medium">Weather Data</div>
-            <div className="w-36 text-xs text-gray-400 mt-1">API Integration</div>
+      <div className="sticky top-0 z-10 mb-8 rounded-lg border border-slate-200 bg-white/95 p-5 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <div className="text-lg text-slate-950 tracking-tight">Demo Simulation Controls</div>
+            <div className="text-sm text-slate-500">Always visible controls that update backend sensor state and recommendations.</div>
           </div>
-          <ArrowRight className="w-10 h-10 text-white/40" strokeWidth={3} />
-          <div className="flex-1 flex flex-col items-center text-center">
-            <div className="w-36 h-36 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center mb-3 shadow-2xl">
-              <Radio className="w-16 h-16 text-white" strokeWidth={1.5} />
-            </div>
-            <div className="w-36 text-sm text-white font-medium">IoT Sensors</div>
-            <div className="w-36 text-xs text-gray-400 mt-1">Field Network</div>
-          </div>
-          <ArrowRight className="w-10 h-10 text-white/40" strokeWidth={3} />
-          <div className="flex-1 flex flex-col items-center text-center">
-            <div className="w-36 h-36 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-3 shadow-2xl ring-4 ring-white/20">
-              <Cpu className="w-16 h-16 text-white" strokeWidth={1.5} />
-            </div>
-            <div className="w-36 text-sm text-white font-medium">AI Engine</div>
-            <div className="w-36 text-xs text-gray-400 mt-1">Decision Making</div>
-          </div>
-          <ArrowRight className="w-10 h-10 text-white/40" strokeWidth={3} />
-          <div className="flex-1 flex flex-col items-center text-center">
-            <div className="w-36 h-36 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center mb-3 shadow-2xl">
-              <Gauge className="w-16 h-16 text-white" strokeWidth={1.5} />
-            </div>
-            <div className="w-36 text-sm text-white font-medium">Smart Valves</div>
-            <div className="w-36 text-xs text-gray-400 mt-1">Pipe Control</div>
+          <div className="flex flex-wrap gap-3">
+            <SimulationButton onClick={() => onSimulate('heatwave')} tone="danger">
+              Simulate Heatwave
+            </SimulationButton>
+            <SimulationButton onClick={() => onSimulate('rain')} tone="info">
+              Simulate Rain Event
+            </SimulationButton>
+            <SimulationButton onClick={() => onSimulate('lowPressure')} tone="warning">
+              Simulate Low Pressure
+            </SimulationButton>
+            <button
+              onClick={onRecalculate}
+              className="rounded-lg bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700"
+            >
+              Recalculate Plan
+            </button>
+            <button
+              onClick={() => onSimulate('reset')}
+              className="flex items-center gap-2 rounded-lg bg-slate-100 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset Demo Data
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Sensor Data Cards */}
-      <div className="grid grid-cols-3 gap-6 mb-8">
-        <SensorCard
-          field="Field A - Olives (Sfax)"
-          data={[
-            { label: 'Soil Moisture', value: `${sensorData.fieldA.soilMoisture}%`, target: 'Target: 32%' },
-            { label: 'Rain Probability', value: `${sensorData.fieldA.rainProbability}%`, target: `Forecast: ${sensorData.fieldA.rainForecast} mm` },
-            { label: 'Heatwave Risk', value: sensorData.fieldA.heatwave, target: `ET: ${sensorData.fieldA.et} mm/day` },
-            { label: 'Pressure', value: `${sensorData.fieldA.pressure} bar`, target: 'Min: 1.8 bar', status: sensorData.fieldA.pressure >= 1.8 ? 'ok' : 'warning' },
-            { label: 'Flow Rate', value: `${sensorData.fieldA.flow} L/min`, target: 'Target flow' },
-          ]}
-        />
-        <SensorCard
-          field="Field B - Tomatoes (Sidi Bouzid)"
-          data={[
-            { label: 'Soil Moisture', value: `${sensorData.fieldB.soilMoisture}%`, target: 'Target: 30%' },
-            { label: 'Rain Probability', value: `${sensorData.fieldB.rainProbability}%`, target: `Forecast: ${sensorData.fieldB.rainForecast} mm` },
-            { label: 'Heatwave Risk', value: sensorData.fieldB.heatwave, target: `ET: ${sensorData.fieldB.et} mm/day` },
-            { label: 'Pressure', value: `${sensorData.fieldB.pressure} bar`, target: 'Min: 1.7 bar', status: sensorData.fieldB.pressure >= 1.7 ? 'ok' : 'warning' },
-            { label: 'Flow Rate', value: `${sensorData.fieldB.flow} L/min`, target: 'Target flow' },
-          ]}
-        />
-        <SensorCard
-          field="Field C - Citrus (Nabeul)"
-          data={[
-            { label: 'Soil Moisture', value: `${sensorData.fieldC.soilMoisture}%`, target: 'Target: 35%' },
-            { label: 'Rain Probability', value: `${sensorData.fieldC.rainProbability}%`, target: `Forecast: ${sensorData.fieldC.rainForecast} mm` },
-            { label: 'Heatwave Risk', value: sensorData.fieldC.heatwave, target: `ET: ${sensorData.fieldC.et} mm/day` },
-            { label: 'Pressure', value: `${sensorData.fieldC.pressure} bar`, target: 'Min: 1.8 bar', status: sensorData.fieldC.pressure >= 1.8 ? 'ok' : 'warning' },
-            { label: 'Flow Rate', value: `${sensorData.fieldC.flow} L/min`, target: 'Target flow' },
-          ]}
-        />
+      {diagnosticMessage && (
+        <div className="mb-8 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          {diagnosticMessage}
+        </div>
+      )}
+
+      <div className="rounded-lg border border-slate-700 bg-slate-900 p-6 mb-8 shadow-lg md:p-8">
+        <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
+          <FlowNode icon={CloudRain} title="Weather Data" subtitle="API Integration" color="from-blue-500 to-cyan-500" />
+          <FlowArrow />
+          <FlowNode icon={Radio} title="IoT Sensors" subtitle="Field Network" color="from-emerald-500 to-green-500" />
+          <FlowArrow />
+          <FlowNode icon={Cpu} title="AI Engine" subtitle="Decision Making" color="from-violet-500 to-fuchsia-500" highlight />
+          <FlowArrow />
+          <FlowNode icon={Gauge} title="Smart Valves" subtitle="Pipe Control" color="from-amber-500 to-red-500" />
+        </div>
       </div>
 
-      {/* Simulation Controls */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-lg">
-        <div className="text-lg text-gray-900 mb-5 tracking-tight">Demo Simulation Controls</div>
-        <div className="flex gap-4">
-          <button
-            onClick={simulateHeatwave}
-            className="px-6 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl hover:from-red-600 hover:to-orange-600 transition-all shadow-lg shadow-red-500/30 text-sm font-medium"
-          >
-            Simulate Heatwave
-          </button>
-          <button
-            onClick={simulateRain}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all shadow-lg shadow-blue-500/30 text-sm font-medium"
-          >
-            Simulate Rain Event
-          </button>
-          <button
-            onClick={simulateLowPressure}
-            className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:from-orange-600 hover:to-red-600 transition-all shadow-lg shadow-orange-500/30 text-sm font-medium"
-          >
-            Simulate Low Pressure
-          </button>
-          <button
-            onClick={resetData}
-            className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium flex items-center gap-2"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Reset Demo Data
-          </button>
+      <div className="grid grid-cols-1 gap-5 mb-8 xl:grid-cols-3">
+        {fields.map(field => (
+          <SensorCard
+            key={field.id}
+            field={field}
+            onAdjustSensor={onAdjustSensor}
+            onRunDiagnostic={handleDiagnostic}
+            isDiagnosing={diagnosticFieldId === field.id}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  async function handleDiagnostic(fieldId: string) {
+    setDiagnosticFieldId(fieldId);
+    setDiagnosticMessage(null);
+
+    try {
+      const result = await onRunDiagnostic(fieldId);
+      setDiagnosticMessage(result?.message ?? 'Diagnostic unavailable while the backend is offline.');
+    } finally {
+      setDiagnosticFieldId(null);
+    }
+  }
+}
+
+function FlowNode({
+  icon: Icon,
+  title,
+  subtitle,
+  color,
+  highlight = false,
+}: {
+  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  title: string;
+  subtitle: string;
+  color: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <div className={`w-32 h-32 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center mb-3 shadow-lg md:w-36 md:h-36 ${highlight ? 'ring-4 ring-white/20' : ''}`}>
+        <Icon className="w-14 h-14 text-white md:w-16 md:h-16" strokeWidth={1.5} />
+      </div>
+      <div className="w-36 text-sm text-white font-medium">{title}</div>
+      <div className="w-36 text-xs text-slate-400 mt-1">{subtitle}</div>
+    </div>
+  );
+}
+
+function FlowArrow() {
+  return (
+    <div className="hidden h-36 items-center justify-center md:flex">
+      <ArrowRight className="w-8 h-8 text-white/40" strokeWidth={3} />
+    </div>
+  );
+}
+
+function SensorCard({
+  field,
+  onAdjustSensor,
+  onRunDiagnostic,
+  isDiagnosing,
+}: {
+  field: FarmField;
+  onAdjustSensor: (fieldId: string, adjustment: SensorAdjustment) => void;
+  onRunDiagnostic: (fieldId: string) => void;
+  isDiagnosing: boolean;
+}) {
+  const pressureOk = field.sensor.pressure >= field.minPressure;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+      <div className="text-lg text-slate-950 mb-4 tracking-tight">
+        {field.name} - {field.crop} ({field.region})
+      </div>
+      <div className="space-y-3">
+        <SensorRow label="Soil Moisture" value={`${field.sensor.soilMoisture}%`} target={`Target: ${field.targetMoisture}%`} />
+        <SensorRow label="Rain Probability" value={`${field.sensor.rainProbability}%`} target={`Forecast: ${field.sensor.rainForecast} mm`} />
+        <SensorRow label="Heatwave Risk" value={field.sensor.heatwave} target={`ET: ${field.sensor.et} mm/day`} />
+        <SensorRow
+          label="Pressure"
+          value={`${field.sensor.pressure} bar`}
+          target={`Min: ${field.minPressure} bar`}
+          status={pressureOk ? 'ok' : 'warning'}
+        />
+        <SensorRow label="Flow Rate" value={`${field.sensor.flow} L/min`} target="Target flow" />
+      </div>
+
+      {!pressureOk && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+          Pressure alert: below safe operating threshold. Irrigation remains blocked.
         </div>
+      )}
+
+      <div className="mt-5 border-t border-slate-200 pt-4">
+        <div className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-3">Quick Sensor Actions</div>
+        <div className="grid grid-cols-2 gap-2">
+          <SmallActionButton onClick={() => onAdjustSensor(field.id, { soilMoistureDelta: 3 })}>
+            + Moisture
+          </SmallActionButton>
+          <SmallActionButton onClick={() => onAdjustSensor(field.id, { soilMoistureDelta: -3 })}>
+            - Moisture
+          </SmallActionButton>
+          <SmallActionButton onClick={() => onAdjustSensor(field.id, { pressureDelta: 0.2 })}>
+            + Pressure
+          </SmallActionButton>
+          <SmallActionButton onClick={() => onAdjustSensor(field.id, { pressureDelta: -0.2 })}>
+            - Pressure
+          </SmallActionButton>
+        </div>
+        <button
+          onClick={() => onRunDiagnostic(field.id)}
+          className="mt-3 w-full rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+        >
+          {isDiagnosing ? 'Running Diagnostic...' : 'Run Field Diagnostic'}
+        </button>
       </div>
     </div>
   );
 }
 
-function SensorCard({ field, data }: any) {
+function SensorRow({
+  label,
+  value,
+  target,
+  status = 'ok',
+}: {
+  label: string;
+  value: string;
+  target: string;
+  status?: 'ok' | 'warning';
+}) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-lg hover:shadow-xl transition-shadow">
-      <div className="text-lg text-gray-900 mb-5 tracking-tight">{field}</div>
-      <div className="space-y-3">
-        {data.map((item: any, index: number) => (
-          <div key={index} className="flex justify-between items-center">
-            <div className="text-sm text-gray-600">{item.label}</div>
-            <div className="text-right">
-              <div className={`text-sm ${item.status === 'warning' ? 'text-red-600' : 'text-gray-900'}`}>
-                {item.value}
-              </div>
-              <div className="text-xs text-gray-500">{item.target}</div>
-            </div>
-          </div>
-        ))}
+    <div className="flex justify-between gap-4">
+      <div className="text-sm text-slate-600">{label}</div>
+      <div className="text-right">
+        <div className={`text-sm ${status === 'warning' ? 'text-red-600' : 'text-slate-950'}`}>{value}</div>
+        <div className="text-xs text-slate-500">{target}</div>
       </div>
     </div>
+  );
+}
+
+function SimulationButton({
+  children,
+  onClick,
+  tone,
+}: {
+  children: string;
+  onClick: () => void;
+  tone: 'danger' | 'info' | 'warning';
+}) {
+  const colors = {
+    danger: 'bg-red-600 hover:bg-red-700',
+    info: 'bg-blue-600 hover:bg-blue-700',
+    warning: 'bg-amber-600 hover:bg-amber-700',
+  };
+
+  return (
+    <button onClick={onClick} className={`rounded-lg px-5 py-3 text-sm font-medium text-white shadow-sm transition ${colors[tone]}`}>
+      {children}
+    </button>
+  );
+}
+
+function SmallActionButton({ children, onClick }: { children: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+    >
+      {children}
+    </button>
   );
 }

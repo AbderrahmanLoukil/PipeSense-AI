@@ -1,318 +1,294 @@
-import { ArrowRight, Play, Zap, CloudRain, Radio, Cpu, Gauge, Droplets, AlertTriangle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { AlertTriangle, ArrowRight, CloudRain, Cpu, Droplets, Gauge, Play, Radio, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { ComponentType } from 'react';
+import type { ExecutionLogEntry, FarmExecutionState, FarmField, OperationEvent, ValveOverrideResult, ValveTestResult } from '../types';
 
 interface ActionEngineProps {
-  executed: boolean;
+  fields: FarmField[];
+  execution: FarmExecutionState;
   onExecute: () => void;
+  onReset: () => void;
+  onValveTest: (fieldId: string) => Promise<ValveTestResult | null>;
+  onValveOverride: (fieldId: string, action: 'open' | 'close') => Promise<ValveOverrideResult | null>;
+  onLoadOperations: () => Promise<OperationEvent[]>;
 }
 
-export function ActionEngine({ executed, onExecute }: ActionEngineProps) {
-  const [fieldAProgress, setFieldAProgress] = useState(0);
+export function ActionEngine({ fields, execution, onExecute, onReset, onValveTest, onValveOverride, onLoadOperations }: ActionEngineProps) {
+  const [localProgress, setLocalProgress] = useState(execution.progress);
+  const [valveMessage, setValveMessage] = useState<string | null>(null);
+  const [valveResults, setValveResults] = useState<Record<string, ValveTestResult['status'] | 'offline'>>({});
+  const [testingFieldId, setTestingFieldId] = useState<string | null>(null);
+  const [overridingFieldId, setOverridingFieldId] = useState<string | null>(null);
+  const [operationEvents, setOperationEvents] = useState<OperationEvent[]>([]);
 
   useEffect(() => {
-    if (executed && fieldAProgress < 100) {
-      const interval = setInterval(() => {
-        setFieldAProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return prev + 2;
-        });
-      }, 100);
-      return () => clearInterval(interval);
+    setLocalProgress(execution.progress);
+  }, [execution.progress, execution.started]);
+
+  useEffect(() => {
+    refreshOperations();
+  }, []);
+
+  useEffect(() => {
+    if (!execution.started || localProgress >= 100) {
+      return;
     }
-  }, [executed, fieldAProgress]);
+
+    const interval = window.setInterval(() => {
+      setLocalProgress(previous => Math.min(previous + 2, 100));
+    }, 100);
+
+    return () => window.clearInterval(interval);
+  }, [execution.started, localProgress]);
+
+  const isExecuting = execution.started;
+  const log = execution.log.length ? execution.log : buildLocalLog(localProgress);
 
   return (
-    <div className="p-8">
-      <div className="mb-10">
-        <h1 className="text-4xl text-gray-900 mb-3 tracking-tight">Action Engine</h1>
-        <p className="text-lg text-gray-600">Real-time valve control and flow monitoring at the pipe level</p>
+    <div className="p-5 md:p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl text-slate-950 mb-2 tracking-tight md:text-4xl">Action Engine</h1>
+        <p className="text-base text-slate-600 md:text-lg">Real-time valve control and flow monitoring at pipe level</p>
       </div>
 
-      {/* Hero Flow Diagram */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-12 mb-10 shadow-2xl border border-slate-700">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur px-6 py-3 rounded-full border border-white/20">
-            <Zap className="w-5 h-5 text-yellow-400" />
+      <div className="rounded-lg border border-slate-700 bg-slate-900 p-6 mb-8 shadow-lg md:p-8">
+        <div className="text-center mb-7">
+          <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/10 px-5 py-2">
+            <Zap className="w-5 h-5 text-amber-300" />
             <span className="text-white font-medium">From Prediction to Pipe-Level Action</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4">
-          <FlowNode
-            icon={CloudRain}
-            title="Climate Data"
-            subtitle="Weather & Forecast"
-            color="from-blue-500 to-cyan-500"
-          />
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr]">
+          <FlowNode icon={CloudRain} title="Climate Data" subtitle="Weather & Forecast" color="from-blue-500 to-cyan-500" />
           <FlowArrow />
-          <FlowNode
-            icon={Cpu}
-            title="AI Engine"
-            subtitle="Smart Analysis"
-            color="from-purple-500 to-pink-500"
-            highlight
-          />
+          <FlowNode icon={Cpu} title="AI Engine" subtitle="Smart Analysis" color="from-violet-500 to-fuchsia-500" highlight />
           <FlowArrow />
-          <FlowNode
-            icon={Radio}
-            title="Controller"
-            subtitle="Command Center"
-            color="from-indigo-500 to-blue-500"
-          />
+          <FlowNode icon={Radio} title="Controller" subtitle="Command Center" color="from-indigo-500 to-blue-500" />
           <FlowArrow />
-          <FlowNode
-            icon={Gauge}
-            title="Smart Valves"
-            subtitle="Pipe Network"
-            color="from-green-500 to-emerald-500"
-          />
+          <FlowNode icon={Gauge} title="Smart Valves" subtitle="Pipe Network" color="from-emerald-500 to-green-500" />
           <FlowArrow />
-          <FlowNode
-            icon={Droplets}
-            title="Irrigation"
-            subtitle="Field Delivery"
-            color="from-cyan-500 to-blue-500"
-          />
+          <FlowNode icon={Droplets} title="Irrigation" subtitle="Field Delivery" color="from-cyan-500 to-blue-500" />
         </div>
       </div>
 
-      {/* Execute Button */}
-      {!executed && (
-        <div className="mb-10">
-          <button
-            onClick={onExecute}
-            className="px-10 py-5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl hover:from-green-700 hover:to-green-800 transition-all shadow-2xl shadow-green-600/40 text-xl font-medium flex items-center gap-4 hover:scale-105 active:scale-100"
-          >
-            <Play className="w-7 h-7" />
-            Execute Full AI Plan
-            <span className="text-sm bg-white/20 px-3 py-1 rounded-lg">3 Fields</span>
-          </button>
-          <p className="text-sm text-gray-500 mt-4 ml-1">
-            This will open/close valves based on AI recommendations, skip rain-expected fields, and block unsafe pressure zones
+      {!isExecuting && (
+        <div className="mb-8 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={onExecute}
+              className="flex items-center gap-3 rounded-lg bg-emerald-600 px-6 py-3 text-base font-medium text-white shadow-sm transition hover:bg-emerald-700"
+            >
+              <Play className="w-5 h-5" />
+              Execute Full AI Plan
+              <span className="rounded-md bg-white/20 px-2 py-1 text-xs">{fields.length} Fields</span>
+            </button>
+            <button
+              onClick={onReset}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            >
+              Reset Execution State
+            </button>
+          </div>
+          <p className="text-sm text-slate-500 mt-3">
+            Opens safe valves, skips rain-covered fields, and blocks unsafe pressure zones.
           </p>
         </div>
       )}
 
-      {executed && (
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6 mb-10 shadow-lg">
+      {isExecuting && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 mb-8 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
-              <Zap className="w-6 h-6 text-white" />
+            <div className="w-11 h-11 bg-emerald-600 rounded-lg flex items-center justify-center">
+              <Zap className="w-5 h-5 text-white" />
             </div>
             <div>
-              <div className="text-lg text-gray-900 font-medium mb-1">Plan Execution In Progress</div>
-              <div className="text-sm text-gray-600">Monitoring valve states and flow meters across all fields</div>
+              <div className="text-lg text-slate-950 font-medium mb-1">
+                {localProgress >= 100 ? 'Plan Execution Complete' : 'Plan Execution In Progress'}
+              </div>
+              <div className="text-sm text-slate-600">Monitoring valve states and flow meters across all fields</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Valve Control Cards */}
-      <div className="grid grid-cols-3 gap-6 mb-10">
-        <ValveCard
-          field="Field A"
-          crop="Olives (Sfax)"
-          status={executed ? (fieldAProgress >= 100 ? 'completed' : 'running') : 'ready'}
-          pressure={2.4}
-          minPressure={1.8}
-          targetLiters={500000}
-          currentLiters={executed ? (fieldAProgress / 100) * 500000 : 0}
-          progress={executed ? fieldAProgress : 0}
-        />
-        <ValveCard
-          field="Field B"
-          crop="Tomatoes (Sidi Bouzid)"
-          status="skipped"
-          pressure={2.1}
-          minPressure={1.7}
-          targetLiters={0}
-          currentLiters={0}
-          progress={0}
-          reason="Rain expected (9 mm)"
-        />
-        <ValveCard
-          field="Field C"
-          crop="Citrus (Nabeul)"
-          status="blocked"
-          pressure={1.3}
-          minPressure={1.8}
-          targetLiters={378000}
-          currentLiters={0}
-          progress={0}
-          reason="Unsafe pressure"
-        />
+      {valveMessage && (
+        <div className="mb-8 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          {valveMessage}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-5 mb-8 xl:grid-cols-3">
+        {fields.map(field => (
+          <ValveCard
+            key={field.id}
+            field={field}
+            progress={field.id === 'field-a' && isExecuting ? localProgress : 0}
+            isTesting={testingFieldId === field.id}
+            isOverriding={overridingFieldId === field.id}
+            testResult={valveResults[field.id]}
+            onValveTest={handleValveTest}
+            onValveOverride={handleValveOverride}
+          />
+        ))}
       </div>
 
-      {/* Action Log */}
-      {executed && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-lg">
-          <div className="px-8 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-            <div className="text-xl text-gray-900 tracking-tight">Live Execution Log</div>
-            <div className="text-sm text-gray-600 mt-1">Real-time events from controller and field sensors</div>
+      <OperationsPanel events={operationEvents} onRefresh={refreshOperations} />
+
+      {isExecuting && (
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+            <div className="text-xl text-slate-950 tracking-tight">Live Execution Log</div>
+            <div className="text-sm text-slate-600 mt-1">Events from controller and field sensors</div>
           </div>
-          <div className="p-8 space-y-3 bg-slate-950 font-mono text-sm">
-            <LogEntry time="06:00:00.000" event="AI irrigation plan loaded into controller" status="info" />
-            <LogEntry time="06:00:01.234" event="Field A: Valve opening command sent" status="success" />
-            <LogEntry time="06:00:01.456" event="Field A: Flow sensor activated - 180 L/min detected" status="success" />
-            <LogEntry time="06:00:02.100" event="Field B: Irrigation skipped - rain forecast 70% (9mm expected)" status="info" />
-            <LogEntry time="06:00:02.345" event="Field C: BLOCKED - Pressure 1.3 bar below safe threshold (1.8 bar)" status="error" />
-            {fieldAProgress > 20 && <LogEntry time="06:05:30.120" event="Field A: 100,000 L delivered (20% complete)" status="success" />}
-            {fieldAProgress > 50 && <LogEntry time="06:14:15.890" event="Field A: 250,000 L delivered (50% complete)" status="success" />}
-            {fieldAProgress >= 100 && <LogEntry time="06:28:15.567" event="Field A: Target reached - 500,000 L delivered" status="success" />}
-            {fieldAProgress >= 100 && <LogEntry time="06:28:16.123" event="Field A: Valve closing command sent" status="success" />}
-            {fieldAProgress >= 100 && <LogEntry time="06:28:17.890" event="Field A: Valve confirmed closed - flow stopped" status="success" />}
-            {fieldAProgress >= 100 && <LogEntry time="06:28:18.234" event="Execution complete: 1 completed, 1 skipped, 1 blocked" status="info" />}
+          <div className="p-5 space-y-3 bg-slate-950 font-mono text-sm">
+            {log.map(entry => (
+              <LogEntry key={`${entry.time}-${entry.event}`} entry={entry} />
+            ))}
           </div>
         </div>
       )}
     </div>
   );
+
+  async function handleValveTest(fieldId: string) {
+    setTestingFieldId(fieldId);
+    setValveMessage(null);
+
+    try {
+      const result = await onValveTest(fieldId);
+      setValveResults(previous => ({
+        ...previous,
+        [fieldId]: result?.status ?? 'offline',
+      }));
+      setValveMessage(result?.message ?? 'Valve test unavailable while the backend is offline.');
+      refreshOperations();
+    } catch {
+      setValveResults(previous => ({
+        ...previous,
+        [fieldId]: 'offline',
+      }));
+      setValveMessage('Valve test failed safely. The page is still usable; check that the backend is running.');
+    } finally {
+      setTestingFieldId(null);
+    }
+  }
+
+  async function handleValveOverride(fieldId: string, action: 'open' | 'close') {
+    setOverridingFieldId(fieldId);
+    setValveMessage(null);
+
+    try {
+      const result = await onValveOverride(fieldId, action);
+      setValveMessage(result?.message ?? 'Manual override unavailable while the backend is offline.');
+      if (result?.events) {
+        setOperationEvents(result.events);
+      } else {
+        refreshOperations();
+      }
+    } catch {
+      setValveMessage('Manual override failed safely. Check that the backend is running.');
+    } finally {
+      setOverridingFieldId(null);
+    }
+  }
+
+  async function refreshOperations() {
+    const events = await onLoadOperations();
+    setOperationEvents(events);
+  }
 }
 
-function FlowNode({ icon: IconComponent, title, subtitle, color, highlight }: any) {
+function FlowNode({
+  icon: Icon,
+  title,
+  subtitle,
+  color,
+  highlight = false,
+}: {
+  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  title: string;
+  subtitle: string;
+  color: string;
+  highlight?: boolean;
+}) {
   return (
-    <div className={`flex-1 relative ${highlight ? 'scale-110' : ''} transition-transform`}>
-      <div className={`bg-gradient-to-br ${color} rounded-2xl p-6 shadow-2xl ${highlight ? 'ring-4 ring-white/30' : ''}`}>
-        <div className="flex flex-col items-center text-center">
-          <div className="mb-3">
-            <IconComponent className="w-14 h-14 text-white" strokeWidth={1.5} />
-          </div>
-          <div className="text-white font-medium text-lg mb-1">{title}</div>
-          <div className="text-white/80 text-sm">{subtitle}</div>
-        </div>
+    <div className={`relative flex flex-col items-center text-center ${highlight ? 'lg:scale-105' : ''}`}>
+      <div className={`rounded-lg bg-gradient-to-br ${color} p-5 shadow-lg ${highlight ? 'ring-4 ring-white/20' : ''}`}>
+        <Icon className="w-12 h-12 text-white" strokeWidth={1.5} />
       </div>
-      {highlight && (
-        <div className="absolute -top-3 -right-3 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-          AI
-        </div>
-      )}
+      <div className="w-32 text-white font-medium text-sm mt-3">{title}</div>
+      <div className="w-32 text-slate-400 text-xs mt-1">{subtitle}</div>
     </div>
   );
 }
 
 function FlowArrow() {
   return (
-    <div className="flex items-center justify-center">
-      <ArrowRight className="w-8 h-8 text-white/60" strokeWidth={3} />
+    <div className="hidden h-20 items-center justify-center lg:flex">
+      <ArrowRight className="w-7 h-7 text-white/40" strokeWidth={3} />
     </div>
   );
 }
 
-function ValveCard({ field, crop, status, pressure, minPressure, targetLiters, currentLiters, progress, reason }: any) {
-  const statusConfig = {
-    ready: {
-      bg: 'from-blue-50 to-blue-100',
-      border: 'border-blue-300',
-      text: 'text-blue-700',
-      label: 'Ready',
-      valveColor: 'bg-blue-500',
-      ringColor: 'ring-blue-500'
-    },
-    running: {
-      bg: 'from-green-50 to-green-100',
-      border: 'border-green-300',
-      text: 'text-green-700',
-      label: 'Running',
-      valveColor: 'bg-green-500 animate-pulse',
-      ringColor: 'ring-green-500 ring-4'
-    },
-    completed: {
-      bg: 'from-emerald-50 to-emerald-100',
-      border: 'border-emerald-300',
-      text: 'text-emerald-700',
-      label: 'Completed',
-      valveColor: 'bg-emerald-600',
-      ringColor: 'ring-emerald-500'
-    },
-    skipped: {
-      bg: 'from-gray-50 to-gray-100',
-      border: 'border-gray-300',
-      text: 'text-gray-700',
-      label: 'Skipped',
-      valveColor: 'bg-gray-400',
-      ringColor: 'ring-gray-400'
-    },
-    blocked: {
-      bg: 'from-red-50 to-red-100',
-      border: 'border-red-300',
-      text: 'text-red-700',
-      label: 'Blocked',
-      valveColor: 'bg-red-500',
-      ringColor: 'ring-red-500'
-    },
-  };
-
-  const config = statusConfig[status];
-  const pressureOk = pressure >= minPressure;
+function ValveCard({
+  field,
+  progress,
+  isTesting,
+  isOverriding,
+  testResult,
+  onValveTest,
+  onValveOverride,
+}: {
+  field: FarmField;
+  progress: number;
+  isTesting: boolean;
+  isOverriding: boolean;
+  testResult?: ValveTestResult['status'] | 'offline';
+  onValveTest: (fieldId: string) => void;
+  onValveOverride: (fieldId: string, action: 'open' | 'close') => void;
+}) {
+  const targetLiters = field.recommendation.liters;
+  const currentLiters = field.execution.status === 'skipped' || field.execution.status === 'blocked'
+    ? 0
+    : (progress / 100) * targetLiters;
+  const pressureOk = field.sensor.pressure >= field.minPressure;
+  const status = resolveValveStatus(field, progress);
+  const config = valveConfig[status] ?? valveConfig.ready;
   const isActive = status === 'running' || status === 'completed';
 
   return (
-    <div className={`rounded-2xl border-2 p-8 bg-gradient-to-br ${config.bg} ${config.border} shadow-xl`}>
-      <div className="flex items-start justify-between mb-6">
+    <div className={`flex h-full min-h-[640px] flex-col rounded-lg border-2 p-5 bg-gradient-to-br ${config.bg} ${config.border} shadow-sm`}>
+      <div className="flex items-start justify-between gap-4 mb-5">
         <div>
-          <div className="text-xl text-gray-900 mb-1 tracking-tight">{field}</div>
-          <div className="text-sm text-gray-600">{crop}</div>
+          <div className="text-xl text-slate-950 mb-1 tracking-tight">{field.name}</div>
+          <div className="text-sm text-slate-600">{field.crop} ({field.region})</div>
         </div>
-        <div className={`px-4 py-2 rounded-xl text-sm font-medium ${config.text} bg-white/80 backdrop-blur shadow-md`}>
+        <div className={`px-3 py-1.5 rounded-md text-sm font-medium ${config.text} bg-white/80 shadow-sm`}>
           {config.label}
         </div>
       </div>
 
-      {/* Premium Valve Visual */}
-      <div className="mb-6 bg-white/50 backdrop-blur rounded-xl p-6 border border-white/60">
-        <div className="text-sm text-gray-700 mb-4 font-medium">Pipe Valve Status</div>
+      <div className="mb-5 rounded-lg border border-white/70 bg-white/60 p-5">
+        <div className="text-sm text-slate-700 mb-4 font-medium">Pipe Valve Status</div>
         <div className="flex items-center justify-center">
-          <div className="relative">
-            {/* Valve body */}
-            <div className={`w-32 h-32 rounded-full ${config.valveColor} ${config.ringColor} flex items-center justify-center shadow-2xl transition-all`}>
-              <div className="w-24 h-24 rounded-full bg-white/20 backdrop-blur flex items-center justify-center border-4 border-white/40">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {isActive ? (
-                    <>
-                      <circle cx="12" cy="12" r="8" fill="white" opacity="0.9"/>
-                      <path d="M12 8V16M8 12H16" stroke={status === 'completed' ? '#10b981' : '#22c55e'} strokeWidth="2" strokeLinecap="round"/>
-                    </>
-                  ) : status === 'blocked' ? (
-                    <>
-                      <circle cx="12" cy="12" r="8" fill="white" opacity="0.9"/>
-                      <path d="M15 9L9 15M9 9L15 15" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"/>
-                    </>
-                  ) : (
-                    <>
-                      <circle cx="12" cy="12" r="8" fill="white" opacity="0.5"/>
-                      <circle cx="12" cy="12" r="3" fill="#9ca3af"/>
-                    </>
-                  )}
-                </svg>
-              </div>
+          <div className={`w-28 h-28 rounded-full ${config.valveColor} ${isActive ? 'ring-4 ring-emerald-300' : ''} flex items-center justify-center shadow-lg`}>
+            <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center border-4 border-white/40">
+              <ValveIcon status={status} />
             </div>
-            {/* Flow indicator */}
-            {isActive && (
-              <div className="absolute -right-6 top-1/2 -translate-y-1/2">
-                <div className="flex gap-1">
-                  <Droplets className="w-5 h-5 text-blue-500 animate-pulse" />
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Pressure Display */}
-      <div className="mb-6 bg-white/50 backdrop-blur rounded-xl p-4 border border-white/60">
+      <div className="mb-5 rounded-lg border border-white/70 bg-white/60 p-4">
         <div className="flex justify-between items-center">
           <div>
-            <div className="text-xs text-gray-600 mb-1">Pipe Pressure</div>
-            <div className={`text-2xl font-bold ${pressureOk ? 'text-green-600' : 'text-red-600'}`}>
-              {pressure} bar
-            </div>
+            <div className="text-xs text-slate-600 mb-1">Pipe Pressure</div>
+            <div className={`text-2xl font-bold ${pressureOk ? 'text-emerald-600' : 'text-red-600'}`}>{field.sensor.pressure} bar</div>
           </div>
           <div className="text-right">
-            <div className="text-xs text-gray-600 mb-1">Minimum Safe</div>
-            <div className="text-lg text-gray-700">{minPressure} bar</div>
+            <div className="text-xs text-slate-600 mb-1">Minimum Safe</div>
+            <div className="text-lg text-slate-700">{field.minPressure} bar</div>
           </div>
         </div>
         {!pressureOk && (
@@ -323,49 +299,207 @@ function ValveCard({ field, crop, status, pressure, minPressure, targetLiters, c
         )}
       </div>
 
-      {/* Flow Meter */}
       {targetLiters > 0 && (
-        <div className="bg-white/50 backdrop-blur rounded-xl p-4 border border-white/60">
-          <div className="text-xs text-gray-600 mb-3">Flow Meter</div>
-          <div className="text-2xl text-gray-900 mb-3 font-bold tracking-tight">
-            {Math.round(currentLiters).toLocaleString()} L
+        <div className="rounded-lg border border-white/70 bg-white/60 p-4">
+          <div className="text-xs text-slate-600 mb-3">Flow Meter</div>
+          <div className="text-2xl text-slate-950 mb-2 font-bold tracking-tight">{Math.round(currentLiters).toLocaleString()} L</div>
+          <div className="text-sm text-slate-600 mb-3">Target: {targetLiters.toLocaleString()} L</div>
+          <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+            <div className="h-3 bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${Math.min(progress, 100)}%` }} />
           </div>
-          <div className="text-sm text-gray-600 mb-3">
-            Target: {targetLiters.toLocaleString()} L
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
-            <div
-              className="h-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-300 shadow-lg"
-              style={{ width: `${Math.min(progress, 100)}%` }}
-            />
-          </div>
-          <div className="text-xs text-gray-600 mt-2 text-right">{Math.round(progress)}%</div>
+          <div className="text-xs text-slate-600 mt-2 text-right">{Math.round(progress)}%</div>
         </div>
       )}
 
-      {reason && (
-        <div className="mt-6 pt-6 border-t border-white/60">
-          <div className="text-sm text-gray-700 font-medium">{reason}</div>
+      <div className="mt-5 pt-5 border-t border-white/70">
+        <div className="text-sm text-slate-700 font-medium">{field.execution.notes}</div>
+      </div>
+
+      <div className="mt-auto pt-5">
+        <button
+          onClick={() => onValveTest(field.id)}
+          disabled={isTesting}
+          className="w-full rounded-lg border border-slate-200 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isTesting ? 'Testing Valve...' : 'Run Valve Test'}
+        </button>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => onValveOverride(field.id, 'open')}
+            disabled={isOverriding}
+            className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Manual Open
+          </button>
+          <button
+            onClick={() => onValveOverride(field.id, 'close')}
+            disabled={isOverriding}
+            className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Manual Close
+          </button>
         </div>
-      )}
+
+        <div className="mt-3 min-h-[38px]">
+          {testResult && (
+            <div className={`rounded-md px-3 py-2 text-sm font-medium ${
+              testResult === 'passed'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : testResult === 'blocked'
+                  ? 'bg-red-50 text-red-700 border border-red-200'
+                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+            }`}>
+              Valve test: {testResult}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-function LogEntry({ time, event, status }: any) {
+function OperationsPanel({ events, onRefresh }: { events: OperationEvent[]; onRefresh: () => void }) {
+  return (
+    <div className="mb-8 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+        <div>
+          <div className="text-lg text-slate-950">Operations Log</div>
+          <div className="text-sm text-slate-500">Backend events from simulations, valve tests, overrides, and reports.</div>
+        </div>
+        <button
+          onClick={onRefresh}
+          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+        >
+          Refresh
+        </button>
+      </div>
+      <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+        {events.length === 0 ? (
+          <div className="px-5 py-6 text-sm text-slate-500">No operations recorded yet. Try a valve test or manual override.</div>
+        ) : (
+          events.map(event => (
+            <div key={event.id} className="grid grid-cols-[110px_1fr] gap-4 px-5 py-3 text-sm">
+              <div className={`font-medium ${event.status === 'success' ? 'text-emerald-700' : event.status === 'warning' ? 'text-amber-700' : event.status === 'error' ? 'text-red-700' : 'text-blue-700'}`}>
+                {event.type}
+              </div>
+              <div>
+                <div className="text-slate-800">{event.message}</div>
+                <div className="text-xs text-slate-500">{new Date(event.createdAt).toLocaleTimeString()}</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ValveIcon({ status }: { status: ReturnType<typeof resolveValveStatus> }) {
+  if (status === 'blocked') {
+    return (
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="8" fill="white" opacity="0.9" />
+        <path d="M15 9L9 15M9 9L15 15" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (status === 'running' || status === 'completed') {
+    return (
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="8" fill="white" opacity="0.9" />
+        <path d="M12 8V16M8 12H16" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg width="38" height="38" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" fill="white" opacity="0.5" />
+      <circle cx="12" cy="12" r="3" fill="#94a3b8" />
+    </svg>
+  );
+}
+
+function resolveValveStatus(field: FarmField, progress: number) {
+  if (field.execution.status === 'skipped' || field.execution.status === 'blocked') {
+    return field.execution.status;
+  }
+  if (progress >= 100) {
+    return 'completed';
+  }
+  if (progress > 0) {
+    return 'running';
+  }
+  return field.execution.status;
+}
+
+const valveConfig = {
+  ready: {
+    bg: 'from-blue-50 to-blue-100',
+    border: 'border-blue-200',
+    text: 'text-blue-700',
+    label: 'Ready',
+    valveColor: 'bg-blue-500',
+  },
+  running: {
+    bg: 'from-emerald-50 to-emerald-100',
+    border: 'border-emerald-200',
+    text: 'text-emerald-700',
+    label: 'Running',
+    valveColor: 'bg-emerald-500 animate-pulse',
+  },
+  completed: {
+    bg: 'from-emerald-50 to-emerald-100',
+    border: 'border-emerald-200',
+    text: 'text-emerald-700',
+    label: 'Completed',
+    valveColor: 'bg-emerald-600',
+  },
+  skipped: {
+    bg: 'from-slate-50 to-slate-100',
+    border: 'border-slate-200',
+    text: 'text-slate-700',
+    label: 'Skipped',
+    valveColor: 'bg-slate-400',
+  },
+  blocked: {
+    bg: 'from-red-50 to-red-100',
+    border: 'border-red-200',
+    text: 'text-red-700',
+    label: 'Blocked',
+    valveColor: 'bg-red-500',
+  },
+};
+
+function LogEntry({ entry }: { entry: ExecutionLogEntry }) {
   const statusConfig = {
-    success: { color: 'text-green-400', icon: '●' },
+    success: { color: 'text-emerald-400', icon: '●' },
     error: { color: 'text-red-400', icon: '●' },
     info: { color: 'text-blue-400', icon: '●' },
   };
-
-  const config = statusConfig[status];
+  const config = statusConfig[entry.status];
 
   return (
     <div className="flex items-start gap-4">
-      <span className="text-gray-500">[{time}]</span>
+      <span className="text-slate-500">[{entry.time}]</span>
       <span className={config.color}>{config.icon}</span>
-      <span className="text-gray-300 flex-1">{event}</span>
+      <span className="text-slate-300 flex-1">{entry.event}</span>
     </div>
   );
+}
+
+function buildLocalLog(progress: number): ExecutionLogEntry[] {
+  const log: ExecutionLogEntry[] = [
+    { time: '06:00:00.000', event: 'AI irrigation plan loaded into controller', status: 'info' },
+    { time: '06:00:01.234', event: 'Field A: valve opening command sent', status: 'success' },
+    { time: '06:00:02.345', event: 'Field C: blocked - pressure below safe threshold', status: 'error' },
+  ];
+
+  if (progress >= 100) {
+    log.push({ time: '06:28:18.234', event: 'Execution complete: 1 completed, 1 skipped, 1 blocked', status: 'info' });
+  }
+
+  return log;
 }
