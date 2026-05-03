@@ -97,36 +97,36 @@ export function ClimateAndSensors() {
       {/* Flow Diagram */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-10 mb-10 shadow-2xl border border-slate-700">
         <div className="flex items-center justify-between gap-4">
-          <div className="text-center flex-1">
+          <div className="flex-1 flex flex-col items-center text-center">
             <div className="w-36 h-36 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-3 shadow-2xl">
               <CloudRain className="w-16 h-16 text-white" strokeWidth={1.5} />
             </div>
-            <div className="text-sm text-white font-medium">Weather Data</div>
-            <div className="text-xs text-gray-400 mt-1">API Integration</div>
+            <div className="w-36 text-sm text-white font-medium">Weather Data</div>
+            <div className="w-36 text-xs text-gray-400 mt-1">API Integration</div>
           </div>
           <ArrowRight className="w-10 h-10 text-white/40" strokeWidth={3} />
-          <div className="text-center flex-1">
+          <div className="flex-1 flex flex-col items-center text-center">
             <div className="w-36 h-36 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center mb-3 shadow-2xl">
               <Radio className="w-16 h-16 text-white" strokeWidth={1.5} />
             </div>
-            <div className="text-sm text-white font-medium">IoT Sensors</div>
-            <div className="text-xs text-gray-400 mt-1">Field Network</div>
+            <div className="w-36 text-sm text-white font-medium">IoT Sensors</div>
+            <div className="w-36 text-xs text-gray-400 mt-1">Field Network</div>
           </div>
           <ArrowRight className="w-10 h-10 text-white/40" strokeWidth={3} />
-          <div className="text-center flex-1">
+          <div className="flex-1 flex flex-col items-center text-center">
             <div className="w-36 h-36 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-3 shadow-2xl ring-4 ring-white/20">
               <Cpu className="w-16 h-16 text-white" strokeWidth={1.5} />
             </div>
-            <div className="text-sm text-white font-medium">AI Engine</div>
-            <div className="text-xs text-gray-400 mt-1">Decision Making</div>
+            <div className="w-36 text-sm text-white font-medium">AI Engine</div>
+            <div className="w-36 text-xs text-gray-400 mt-1">Decision Making</div>
           </div>
           <ArrowRight className="w-10 h-10 text-white/40" strokeWidth={3} />
-          <div className="text-center flex-1">
+          <div className="flex-1 flex flex-col items-center text-center">
             <div className="w-36 h-36 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center mb-3 shadow-2xl">
               <Gauge className="w-16 h-16 text-white" strokeWidth={1.5} />
             </div>
-            <div className="text-sm text-white font-medium">Smart Valves</div>
-            <div className="text-xs text-gray-400 mt-1">Pipe Control</div>
+            <div className="w-36 text-sm text-white font-medium">Smart Valves</div>
+            <div className="w-36 text-xs text-gray-400 mt-1">Pipe Control</div>
           </div>
         </div>
       </div>
